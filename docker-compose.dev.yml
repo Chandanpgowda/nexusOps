@@ -1,0 +1,7 @@
+# Development overrides: infrastructure containers restart automatically,
+# and no resource limits are applied (faster local iteration).
+services:
+  postgres:
+    restart: unless-stopped
+  redis:
+    restart: unless-stopped

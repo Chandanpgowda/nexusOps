@@ -1,0 +1,541 @@
+// =====================================================================
+// NEXUSOPS - PostgreSQL schema (Prisma ORM + pgvector)
+// Conventions: UUID PKs, createdAt/updatedAt timestamps, FK indexes,
+// explicit cascade rules. All comments are ASCII-only.
+// =====================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// --------------------------- IDENTITY & ACCESS ---------------------------
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique // ADMIN | IT_MANAGER | TECHNICIAN | EMPLOYEE
+  description String
+  permissions Json     @default("[]") // fine-grained permission strings
+  users       UserRole[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  fullName     String
+  phone        String?
+  avatarUrl    String?
+  isActive     Boolean   @default(true) // account status gate at login
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  roles             UserRole[]
+  departments       UserDepartment[]
+  reportedIncidents Incident[]           @relation("Reporter")
+  assignedIncidents Incident[]           @relation("Assignee")
+  comments          IncidentComment[]
+  attachments       IncidentAttachment[]
+  incidentHistory   IncidentHistory[]
+  ownedProblems     Problem[]            @relation("ProblemOwner")
+  requestedChanges  Change[]             @relation("ChangeRequester")
+  approvedChanges   Change[]             @relation("ChangeApprover")
+  changeApprovals   ChangeApproval[]
+  articles          KnowledgeArticle[]   @relation("ArticleAuthor")
+  approvedArticles  KnowledgeArticle[]   @relation("ArticleApprover")
+  notifications     Notification[]
+  auditLogs         AuditLog[]
+  aiInteractions    AiInteraction[]
+  refreshTokens     RefreshToken[]
+passwordResetTokens PasswordResetToken[]
+  assignedAssets    Asset[]              @relation("AssetAssignee")
+  assetAssignments  AssetAssignment[]    @relation("AssignmentActor")
+}
+
+model UserRole {
+  userId String
+  roleId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+}
+
+model Department {
+  id          String  @id @default(uuid())
+  name        String  @unique
+  description String?
+  users       UserDepartment[]
+  incidents   Incident[]
+  assets      Asset[]
+}
+
+model UserDepartment {
+  userId       String
+  departmentId String
+  isPrimary    Boolean    @default(true)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+
+  @@id([userId, departmentId])
+  @@index([departmentId])
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique // sha256 of token; raw token never stored
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique // sha256 of reset token; raw never stored
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// --------------------------- ASSET MANAGEMENT ---------------------------
+
+enum AssetType {
+  LAPTOP
+  DESKTOP
+  MONITOR
+  PRINTER
+  ROUTER
+  SERVER
+  MOBILE_DEVICE
+  NETWORK_DEVICE
+  OTHER
+}
+
+enum AssetStatus {
+  IN_USE
+  IN_STOCK
+  IN_REPAIR
+  RETIRED
+}
+
+model Asset {
+  id             String      @id @default(uuid())
+  assetTag       String      @unique // e.g. LAP-1024
+  name           String
+  type           AssetType
+  serialNumber   String      @unique
+  status         AssetStatus @default(IN_STOCK)
+  assignedUserId String?
+  departmentId   String?
+  purchaseDate   DateTime?
+  warrantyExpiry DateTime?
+  os             String?
+  location       String?
+  notes          String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  assignedUser User?            @relation("AssetAssignee", fields: [assignedUserId], references: [id], onDelete: SetNull)
+  department   Department?      @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  incidents    Incident[]
+  assignments  AssetAssignment[]
+
+  @@index([assignedUserId])
+  @@index([departmentId])
+  @@index([type, status])
+}
+
+model AssetAssignment {
+  id         String   @id @default(uuid())
+  assetId    String
+  fromUserId String?
+  toUserId   String?
+  assignedAt DateTime @default(now())
+  note       String?
+  asset      Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  actor      User?    @relation("AssignmentActor", fields: [toUserId], references: [id], onDelete: SetNull)
+
+  @@index([assetId])
+}
+
+// --------------------------- SLA ---------------------------
+
+model SlaPolicy {
+  id                String           @id @default(uuid())
+  priority          IncidentPriority @unique
+  responseMinutes   Int
+  resolutionMinutes Int
+  incidents         Incident[]
+}
+
+// --------------------------- INCIDENT MANAGEMENT ---------------------------
+
+enum IncidentStatus {
+  OPEN
+  ASSIGNED
+  IN_PROGRESS
+  WAITING_FOR_USER
+  WAITING_FOR_VENDOR
+  RESOLVED
+  CLOSED
+  REOPENED
+}
+
+enum IncidentPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum IncidentCategory {
+  NETWORK
+  HARDWARE
+  SOFTWARE
+  SECURITY
+  ACCOUNT
+  EMAIL
+  SERVER
+  DATABASE
+  VPN
+  OTHER
+}
+
+model Incident {
+  id                 String           @id @default(uuid())
+  ref                String           @unique // INC-1024
+  title              String
+  description        String
+  status             IncidentStatus   @default(OPEN)
+  priority           IncidentPriority @default(MEDIUM)
+  priorityBy         IncidentPrioritySource @default(USER)
+  category           IncidentCategory
+  categoryBy         IncidentCategorySource @default(USER)
+  resolution         String?
+  resolvedAt         DateTime?
+  closedAt           DateTime?
+  firstResponseAt    DateTime?
+  responseDeadline   DateTime?
+  resolutionDeadline DateTime?
+  slaBreached        Boolean          @default(false)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  reporterId   String
+  assigneeId   String?
+  departmentId String?
+  assetId      String?
+  slaPolicyId  String?
+
+  reporter   User            @relation("Reporter", fields: [reporterId], references: [id], onDelete: Restrict)
+  assignee   User?           @relation("Assignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  department Department?     @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  asset      Asset?          @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  slaPolicy  SlaPolicy?      @relation(fields: [slaPolicyId], references: [id], onDelete: SetNull)
+
+  comments       IncidentComment[]
+  attachments    IncidentAttachment[]
+  history        IncidentHistory[]
+  problems       ProblemIncident[]
+  aiInteractions AiInteraction[]
+  embeddings     IncidentEmbedding[]
+
+  @@index([status, priority])
+  @@index([assigneeId, status])
+  @@index([reporterId, createdAt])
+  @@index([createdAt])
+  @@index([departmentId])
+  @@index([resolutionDeadline])
+}
+
+enum IncidentPrioritySource {
+  USER
+  AI
+  TECHNICIAN
+  MANAGER
+}
+
+enum IncidentCategorySource {
+  USER
+  AI
+  TECHNICIAN
+}
+
+model IncidentComment {
+  id         String   @id @default(uuid())
+  incidentId String
+  authorId   String
+  body       String
+  isInternal Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  incident    Incident             @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  author      User                 @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  attachments IncidentAttachment[]
+
+  @@index([incidentId, createdAt])
+}
+
+model IncidentAttachment {
+  id               String   @id @default(uuid())
+  incidentId       String
+  commentId        String?
+  uploadedById     String
+  storedFilename   String   @unique // sanitized, UUID-based
+  originalFilename String
+  mimeType         String
+  sizeBytes        Int
+  createdAt        DateTime @default(now())
+
+  incident   Incident         @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  comment    IncidentComment? @relation(fields: [commentId], references: [id], onDelete: SetNull)
+  uploadedBy User             @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+
+  @@index([incidentId])
+}
+
+model IncidentHistory {
+  id         String   @id @default(uuid())
+  incidentId String
+  actorId    String?
+  field      String
+  oldValue   String?
+  newValue   String?
+  createdAt  DateTime @default(now())
+
+  incident Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  actor    User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([incidentId, createdAt])
+}
+// --------------------------- PROBLEM MANAGEMENT ---------------------------
+
+enum ProblemStatus {
+  OPEN
+  INVESTIGATING
+  KNOWN_ERROR
+  RESOLVED
+}
+
+model Problem {
+  id           String        @id @default(uuid())
+  ref          String        @unique // PRB-0001
+  title        String
+  description  String
+  rootCause    String?
+  workaround   String?
+  permanentFix String?
+  status       ProblemStatus @default(OPEN)
+  ownerId      String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  owner     User             @relation("ProblemOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  incidents ProblemIncident[]
+
+  @@index([status])
+}
+
+model ProblemIncident {
+  problemId  String
+  incidentId String
+  linkedBy   String?
+  problem    Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  incident   Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+  @@id([problemId, incidentId])
+  @@index([incidentId])
+}
+
+// --------------------------- CHANGE MANAGEMENT ---------------------------
+
+enum ChangeStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  SCHEDULED
+  IMPLEMENTING
+  COMPLETED
+  CANCELLED
+}
+
+enum ChangeRisk {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model Change {
+  id            String       @id @default(uuid())
+  ref           String       @unique // CHG-0001
+  title         String
+  description   String
+  reason        String
+  risk          ChangeRisk
+  impact        String
+  plannedStart  DateTime
+  plannedEnd    DateTime
+  rollbackPlan  String?
+  status        ChangeStatus @default(DRAFT)
+  requestedById String
+  approverId    String?
+  decidedAt     DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  requestedBy User             @relation("ChangeRequester", fields: [requestedById], references: [id], onDelete: Restrict)
+  approver    User?            @relation("ChangeApprover", fields: [approverId], references: [id], onDelete: SetNull)
+  approvals   ChangeApproval[]
+
+  @@index([status])
+  @@index([requestedById])
+}
+
+model ChangeApproval {
+  id         String   @id @default(uuid())
+  changeId   String
+  approverId String
+  decision   String   // APPROVED | REJECTED
+  comment    String?
+  decidedAt  DateTime @default(now())
+  change     Change   @relation(fields: [changeId], references: [id], onDelete: Cascade)
+  approver   User     @relation(fields: [approverId], references: [id], onDelete: Restrict)
+
+  @@index([changeId])
+}
+// --------------------------- KNOWLEDGE BASE ---------------------------
+
+enum ArticleStatus {
+  DRAFT
+  IN_REVIEW
+  PUBLISHED
+  ARCHIVED
+}
+
+model KnowledgeArticle {
+  id           String           @id @default(uuid())
+  slug         String           @unique
+  title        String
+  description  String
+  problem      String
+  solution     String
+  category     IncidentCategory
+  tags         String[]         @default([])
+  status       ArticleStatus    @default(DRAFT)
+  authorId     String
+  approvedById String?
+  publishedAt  DateTime?
+  viewCount    Int              @default(0)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  author     User                 @relation("ArticleAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  approvedBy User?                @relation("ArticleApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  embeddings KnowledgeEmbedding[]
+
+  @@index([status, category])
+  @@index([authorId])
+}
+
+// pgvector column - raw SQL type, queried via $queryRaw with parameters
+model KnowledgeEmbedding {
+  articleId  String
+  chunkIndex Int
+  content    String
+  embedding  Unsupported("vector(768)")?
+  article    KnowledgeArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@id([articleId, chunkIndex])
+}
+
+model IncidentEmbedding {
+  incidentId String
+  embedding  Unsupported("vector(768)")?
+  incident   Incident @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+
+  @@id([incidentId])
+}
+
+// --------------------------- NOTIFICATIONS ---------------------------
+
+model Notification {
+  id         String    @id @default(uuid())
+  userId     String
+  type       String    // TICKET_ASSIGNED | STATUS_CHANGED | COMMENT_ADDED | ...
+  title      String
+  body       String
+  entityType String?
+  entityId   String?
+  isRead     Boolean   @default(false)
+  readAt     DateTime?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
+}
+
+// --------------------------- AUDIT & AI ---------------------------
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?
+  action     String   // LOGIN | INCIDENT_CREATED | ROLE_CHANGED | ...
+  entityType String
+  entityId   String?
+  metadata   Json     @default("{}")
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId])
+  @@index([actorId, createdAt])
+  @@index([createdAt])
+}
+
+enum AiInteractionType {
+  CLASSIFY
+  SUMMARIZE
+  DUPLICATE_CHECK
+  RAG_ANSWER
+}
+
+model AiInteraction {
+  id         String            @id @default(uuid())
+  incidentId String?
+  userId     String?
+  type       AiInteractionType
+  input      Json
+  output     Json
+  model      String
+  accepted   Boolean?
+  rejected   Boolean?
+  latencyMs  Int?
+  createdAt  DateTime          @default(now())
+
+  incident Incident? @relation(fields: [incidentId], references: [id], onDelete: Cascade)
+  user     User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([incidentId])
+  @@index([type, createdAt])
+}

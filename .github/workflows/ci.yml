@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint-and-build:
+    name: Lint, typecheck & build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        workspace: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Backend needs the Prisma client generated before typechecking.
+      - run: npm run db:generate --workspace backend
+        if: matrix.workspace == 'backend'
+      - run: npm run lint --workspace ${{ matrix.workspace }}
+      - run: npm run typecheck --workspace ${{ matrix.workspace }}
+      - run: npm run build --workspace ${{ matrix.workspace }}
+
+  backend-tests:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: nexusops
+          POSTGRES_PASSWORD: nexusops
+          POSTGRES_DB: nexusops_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U nexusops"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run db:generate --workspace backend
+      - run: npx prisma migrate deploy --schema backend/prisma/schema.prisma
+        env:
+          DATABASE_URL: postgresql://nexusops:nexusops@localhost:5432/nexusops_test?schema=public
+      - run: npm run test --workspace backend
+        env:
+          DATABASE_URL: postgresql://nexusops:nexusops@localhost:5432/nexusops_test?schema=public
+          NODE_ENV: test
+
+  docker-build:
+    name: Docker image build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f backend/Dockerfile -t nexusops-backend .
+      - run: docker build -f frontend/Dockerfile -t nexusops-frontend .

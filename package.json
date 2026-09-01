@@ -1,0 +1,26 @@
+{
+  "name": "nexusops",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI-Powered Real-Time IT Operations & Incident Management Platform",
+  "license": "MIT",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "dev:backend": "npm run dev --workspace backend",
+    "dev:frontend": "npm run dev --workspace frontend",
+    "build": "npm run build --workspace backend && npm run build --workspace frontend",
+    "lint": "npm run lint --workspace backend && npm run lint --workspace frontend",
+    "test:backend": "npm run test --workspace backend",
+    "db:migrate": "npm run db:migrate --workspace backend",
+    "db:seed": "npm run db:seed --workspace backend",
+    "db:studio": "npm run db:studio --workspace backend",
+    "infra:up": "docker compose up -d postgres redis",
+    "infra:down": "docker compose down"
+  }
+}
