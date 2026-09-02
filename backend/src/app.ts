@@ -5,7 +5,13 @@ import { env } from './config/env';
 import { logger } from './lib/logger';
 import { AppError } from './lib/errors';
 import { apiLimiter } from './middleware/rate-limit';
+import assetsRoutes from './modules/assets/assets.routes';
+import knowledgeRoutes from './modules/knowledge/knowledge.routes';
+import problemsRoutes from './modules/problems/problems.routes';
+import changesRoutes from './modules/changes/changes.routes';
+import notificationsRoutes from './modules/notifications/notifications.routes';
 import authRoutes from './modules/auth/auth.routes';
+import incidentsRoutes from './modules/incidents/incidents.routes';
 import usersRoutes from './modules/users/users.routes';
 
 export function createApp() {
@@ -26,6 +32,12 @@ export function createApp() {
   });
 
   app.use('/api/auth', authRoutes);
+  app.use('/api/incidents', incidentsRoutes);
+  app.use('/api/notifications', notificationsRoutes);
+app.use('/api/assets', assetsRoutes);
+app.use('/api/knowledge', knowledgeRoutes);
+app.use('/api/problems', problemsRoutes);
+app.use('/api/changes', changesRoutes);
   app.use('/api', usersRoutes);
 
   app.use((_req, res) => {

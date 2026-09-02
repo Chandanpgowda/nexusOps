@@ -1,11 +1,32 @@
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { useAuth } from './context/AuthContext';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import { AppLayout } from './components/layout/AppLayout';
+import { Login } from './pages/Login';
+import { Register } from './pages/Register';
+import { Dashboard } from './pages/Dashboard';
+import { Incidents } from './pages/Incidents';
+
 export default function App() {
+  const { user } = useAuth();
+
   return (
-    <div style={{ fontFamily: 'system-ui, sans-serif', padding: '3rem', maxWidth: 720, margin: '0 auto' }}>
-      <h1>🚀 NexusOps</h1>
-      <p>
-        Welcome to the NexusOps frontend. This scaffold is intentionally minimal for Phase 0 —
-        the full design system and application shell arrive in Phase 4.
-      </p>
-    </div>
+    <Routes>
+      <Route path="/login" element={user ? <Navigate to="/dashboard" replace /> : <Login />} />
+      <Route path="/register" element={user ? <Navigate to="/dashboard" replace /> : <Register />} />
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <AppLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route path="dashboard" element={<Dashboard />} />
+        <Route path="incidents" element={<Incidents />} />
+      </Route>
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
+    </Routes>
   );
 }

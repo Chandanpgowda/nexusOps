@@ -45,3 +45,10 @@ export function withReqMeta(req: Request, partial: Omit<AuditInput, 'ip' | 'user
   const meta = requestMeta(req);
   return { ...partial, ip: meta.ip, userAgent: meta.userAgent };
 }
+
+/** Service object for convenient access across modules. */
+export const auditService = {
+  log: writeAudit,
+  withMeta: withReqMeta,
+  meta: requestMeta,
+};

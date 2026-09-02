@@ -1,0 +1,43 @@
+/* ----- Card Component ----- */
+.card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+}
+
+.card--padding-none { padding: 0; }
+.card--padding-sm { padding: var(--space-3); }
+.card--padding-md { padding: var(--space-4); }
+.card--padding-lg { padding: var(--space-6); }
+
+.card--hover {
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.card--hover:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-secondary);
+  transform: translateY(-1px);
+}
+
+.card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.card__body {
+  padding: var(--space-4) 0;
+}
+
+.card__footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-primary);
+}

@@ -1,0 +1,45 @@
+/* ----- Avatar Component ----- */
+.avatar {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-full);
+  background: var(--color-brand-100);
+  color: var(--color-brand-700);
+  font-weight: var(--font-semibold);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.avatar--sm { width: 28px; height: 28px; font-size: var(--text-xs); }
+.avatar--md { width: 36px; height: 36px; font-size: var(--text-sm); }
+.avatar--lg { width: 48px; height: 48px; font-size: var(--text-base); }
+
+.avatar__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar__initials {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.avatar__status {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 30%;
+  height: 30%;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--bg-elevated);
+}
+
+.avatar__status--online { background: var(--color-success-500); }
+.avatar__status--away { background: var(--color-warning-500); }
+.avatar__status--offline { background: var(--color-gray-400); }
