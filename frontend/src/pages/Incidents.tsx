@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { api } from '../api/client';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
@@ -16,19 +17,13 @@ interface Incident {
   status: string;
   priority: string;
   category: string;
-  assignee?: { name: string; avatarUrl?: string };
-  reporter: { name: string };
+  assignee?: { fullName: string } | null;
+  reporter?: { fullName: string } | null;
   createdAt: string;
   slaBreached: boolean;
 }
 
-const mockIncidents: Incident[] = [
-  { id: '1', ref: 'INC-1011', title: 'VPN connection failing after Windows update', status: 'OPEN', priority: 'HIGH', category: 'NETWORK', reporter: { name: 'Priya Sharma' }, createdAt: '2026-09-01T10:30:00Z', slaBreached: false },
-  { id: '2', ref: 'INC-1010', title: 'Email not syncing on mobile device', status: 'IN_PROGRESS', priority: 'MEDIUM', category: 'EMAIL', assignee: { name: 'Ravi Kumar' }, reporter: { name: 'Amit Patel' }, createdAt: '2026-09-01T09:15:00Z', slaBreached: false },
-  { id: '3', ref: 'INC-1009', title: 'Laptop screen flickering intermittently', status: 'ASSIGNED', priority: 'LOW', category: 'HARDWARE', assignee: { name: 'Sneha Reddy' }, reporter: { name: 'Karthik Nair' }, createdAt: '2026-09-01T08:45:00Z', slaBreached: false },
-  { id: '4', ref: 'INC-1008', title: 'Cannot access shared drive', status: 'WAITING_FOR_USER', priority: 'HIGH', category: 'NETWORK', assignee: { name: 'Ravi Kumar' }, reporter: { name: 'Deepa Menon' }, createdAt: '2026-08-31T16:20:00Z', slaBreached: true },
-  { id: '5', ref: 'INC-1007', title: 'Printer not responding on floor 3', status: 'RESOLVED', priority: 'MEDIUM', category: 'HARDWARE', assignee: { name: 'Sneha Reddy' }, reporter: { name: 'Arjun Das' }, createdAt: '2026-08-31T14:00:00Z', slaBreached: false },
-];
+interface ApiResp<T> { success: boolean; data: { items: T[]; total: number } }
 
 const priorityVariant: Record<string, 'danger' | 'warning' | 'info' | 'default'> = {
   CRITICAL: 'danger',
@@ -47,9 +42,32 @@ const statusVariant: Record<string, 'info' | 'warning' | 'success' | 'default'> 
 };
 
 export const Incidents: React.FC = () => {
+  const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [priorityFilter, setPriorityFilter] = useState('ALL');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params: Record<string, string> = {};
+      if (search) params.search = search;
+      if (statusFilter !== 'ALL') params.status = statusFilter;
+      if (priorityFilter !== 'ALL') params.priority = priorityFilter;
+      const { data: res } = await api.get<ApiResp<Incident>>('/incidents', { params });
+      setIncidents(res.data.items);
+    } catch {
+      setIncidents([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [search, statusFilter, priorityFilter]);
+
+  useEffect(() => {
+    const t = setTimeout(load, search ? 350 : 0);
+    return () => clearTimeout(t);
+  }, [load, search]);
 
   const columns: Column<Incident>[] = [
     { key: 'ref', header: 'ID', width: '100px' },
@@ -58,8 +76,8 @@ export const Incidents: React.FC = () => {
     { key: 'priority', header: 'Priority', width: '110px', render: (item) => <Badge variant={priorityVariant[item.priority] || 'default'}>{item.priority}</Badge> },
     { key: 'assignee', header: 'Assignee', width: '160px', render: (item) => item.assignee ? (
       <div className="incidents__assignee">
-        <Avatar name={item.assignee.name} size="sm" />
-        <span>{item.assignee.name}</span>
+        <Avatar name={item.assignee.fullName} size="sm" />
+        <span>{item.assignee.fullName}</span>
       </div>
     ) : <span className="incidents__unassigned">Unassigned</span> },
     { key: 'createdAt', header: 'Created', width: '120px', render: (item) => new Date(item.createdAt).toLocaleDateString() },
@@ -96,13 +114,15 @@ export const Incidents: React.FC = () => {
         <Select options={statusOptions} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} />
         <Select options={priorityOptions} value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value)} />
       </Card>
-      {mockIncidents.length === 0 ? (
+      {loading ? (
+        <Card padding="none"><div className="incidents__loading">Loading incidents…</div></Card>
+      ) : incidents.length === 0 ? (
         <EmptyState title="No incidents found" description="Create your first incident to get started." />
       ) : (
         <Card padding="none">
           <Table
             columns={columns}
-            data={mockIncidents}
+            data={incidents}
             keyExtractor={(item) => item.id}
             onRowClick={(row) => console.log('navigate to', row.id)}
           />

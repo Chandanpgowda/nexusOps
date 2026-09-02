@@ -1,0 +1,22 @@
+.modules { max-width: 1200px; margin: 0 auto; }
+.modules__header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--space-5); }
+.modules__header h1 { font-size: var(--text-xl); font-weight: 600; color: var(--text-primary); margin: 0 0 var(--space-1); }
+.modules__subtitle { color: var(--text-secondary); font-size: var(--text-sm); margin: 0; }
+.modules__filters { display: flex; gap: var(--space-3); margin-bottom: var(--space-4); }
+.modules__search { flex: 1; }
+.modules__filters .select { width: 200px; }
+.modules__muted { color: var(--text-tertiary); font-style: italic; }
+.modules__loading { padding: var(--space-8); text-align: center; color: var(--text-secondary); font-size: var(--text-sm); }
+.modules__tags { display: flex; gap: var(--space-1); flex-wrap: wrap; }
+.modules__pagination { display: flex; align-items: center; justify-content: center; gap: var(--space-4); margin-top: var(--space-4); color: var(--text-secondary); font-size: var(--text-sm); }
+.modules__form { display: flex; flex-direction: column; gap: var(--space-3); min-width: 380px; }
+.modules__textarea { font: inherit; color: var(--text-primary); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: var(--space-2) var(--space-3); min-height: 70px; resize: vertical; }
+.modules__textarea:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-alpha); }
+.modules__error { color: var(--danger); font-size: var(--text-sm); margin: 0; }
+.modules__actions { display: flex; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-2); }
+.modules__row-actions { display: flex; gap: var(--space-2); }
+.modules__banner { padding: var(--space-3) var(--space-4); margin-bottom: var(--space-4); font-size: var(--text-sm); }
+.modules__banner--error { border-left: 3px solid var(--danger); color: var(--danger); }
+.modules__stepper { width: 100%; }
+.modules__stepper-bar { height: 6px; background: var(--surface-sunken, var(--border)); border-radius: 999px; overflow: hidden; }
+.modules__stepper-fill { height: 100%; background: linear-gradient(90deg, var(--brand), var(--brand-strong, var(--brand))); border-radius: 999px; transition: width 0.4s ease; }
