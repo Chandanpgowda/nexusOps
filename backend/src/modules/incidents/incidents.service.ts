@@ -6,6 +6,8 @@ import { incidentsRepository } from './incidents.repository';
 import { slaService } from './sla.service';
 import { writeAudit } from '../audit/audit.service';
 import { notificationsService } from '../notifications/notifications.service';
+import { enqueueAiAnalysis } from '../../jobs/ai.queue';
+import { env } from '../../config/env';
 import {
   CreateIncidentInput,
   UpdateIncidentInput,
@@ -78,6 +80,13 @@ export class IncidentsService {
     });
     socketManager.emitToRole('IT_MANAGER', 'ticket:new', { id: incident.id, ref });
     socketManager.emitToRole('ADMIN', 'ticket:new', { id: incident.id, ref });
+
+    // Fire-and-forget AI analysis — never blocks the API response
+    if (env.AI_ENABLED) {
+      enqueueAiAnalysis(incident.id).catch((err) =>
+        logger.error({ err, incidentId: incident.id }, 'Failed to enqueue AI analysis')
+      );
+    }
 
     logger.info({ incidentId: incident.id, ref }, 'Incident created');
     return incident;

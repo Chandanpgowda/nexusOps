@@ -13,6 +13,7 @@ import notificationsRoutes from './modules/notifications/notifications.routes';
 import authRoutes from './modules/auth/auth.routes';
 import incidentsRoutes from './modules/incidents/incidents.routes';
 import usersRoutes from './modules/users/users.routes';
+import { aiRoutes } from './modules/ai/ai.routes';
 
 export function createApp() {
   const app = express();
@@ -38,6 +39,7 @@ app.use('/api/assets', assetsRoutes);
 app.use('/api/knowledge', knowledgeRoutes);
 app.use('/api/problems', problemsRoutes);
 app.use('/api/changes', changesRoutes);
+app.use('/api/ai', aiRoutes);
   app.use('/api', usersRoutes);
 
   app.use((_req, res) => {
