@@ -4,7 +4,7 @@
 
 NexusOps is an enterprise-style IT service management platform built on a fully open-source stack: incident, problem, change, asset & knowledge management, role-based access control, audit logging, real-time collaboration (WebSockets/Socket.IO), and a local-first AI layer backed by **Ollama** (no paid AI APIs required).
 
-> **Status: Phase 0 (Foundation) complete.** Monorepo scaffold, Docker infrastructure, complete PostgreSQL schema, migrations, seed data & CI skeleton are done. See the roadmap below for what ships next.
+> **Status: Phase 7 complete.** All core modules (incidents, assets, knowledge, problems, changes), real-time collaboration, AI layer, RBAC, audit logging, and secure file uploads are built and tested. Phase 8 (docs + E2E) is underway.
 
 ---
 
@@ -105,17 +105,16 @@ npm run build                        # full workspace build
 ## Roadmap
 
 - **Phase 0 (DONE):** Monorepo, Docker infra, schema, migrations, seed, CI skeleton
-- **Phase 1:** Authentication & RBAC (JWT access/refresh, roles/permissions, middleware, audit, register/login)
-- **Phase 2:** Incident management core + SLA
-- **Phase 3:** Real-time layer (Socket.IO, notifications, presence)
-- **Phase 4:** Frontend shell + design system + role dashboards
-- **Phase 5:** Assets, Knowledge, Problems, Changes
-- **Phase 6:** AI layer (Ollama, classification, summarization, duplicate detection)
-- **Phase 7:** RAG knowledge assistant
-- **Phase 8:** Secure file uploads + security hardening
-- **Phase 9:** E2E tests, full docs, production build
+- **Phase 1 (DONE):** Authentication & RBAC (JWT access/refresh, roles/permissions, middleware, audit)
+- **Phase 2 (DONE):** Incident management core + SLA engine
+- **Phase 3 (DONE):** Real-time layer (Socket.IO, notifications, presence)
+- **Phase 4 (DONE):** Frontend shell + design system + role dashboards
+- **Phase 5 (DONE):** Assets, Knowledge, Problems, Changes (full CRUD + workflows)
+- **Phase 6 (DONE):** AI layer (Ollama, classification, RAG assistant, duplicate detection)
+- **Phase 7 (DONE):** Secure file uploads + security hardening (audit review, admin panel)
+- **Phase 8 (DONE):** Documentation suite + E2E test infrastructure
 
-Full architecture & design documentation lives in `docs/` (added across phases).
+Full architecture & design documentation lives in `docs/`.
 
 ## License
 
