@@ -20,3 +20,19 @@
 .modules__stepper { width: 100%; }
 .modules__stepper-bar { height: 6px; background: var(--surface-sunken, var(--border)); border-radius: 999px; overflow: hidden; }
 .modules__stepper-fill { height: 100%; background: linear-gradient(90deg, var(--brand), var(--brand-strong, var(--brand))); border-radius: 999px; transition: width 0.4s ease; }
+.admin__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-4); }
+.admin__stat { padding: var(--space-5); text-align: center; }
+.admin__stat-value { font-size: 2.25rem; font-weight: 700; color: var(--color-text); line-height: 1.2; }
+.admin__stat--warning { color: var(--color-warning); }
+.admin__stat--danger { color: var(--color-danger); }
+.admin__stat-label { font-size: 0.8rem; color: var(--color-text-muted); margin-top: var(--space-1); text-transform: uppercase; letter-spacing: 0.05em }
+.modules__tabs { display: flex; gap: var(--space-1); margin-bottom: var(--space-4); border-bottom: 1px solid var(--color-border); padding-bottom: var(--space-2) }
+.modules__tab { padding: var(--space-2) var(--space-4); border: none; background: none; cursor: pointer; font-size: 0.9rem; color: var(--color-text-muted); border-radius: var(--radius-sm); transition: all 0.15s }
+.modules__tab--active { background: var(--color-primary); color: white }
+.modules__actor { font-weight: 500 }
+.modules__entity { color: var(--color-text-muted); font-size: 0.85rem }
+.modules__code { font-family: monospace; font-size: 0.8rem; color: var(--color-text-muted) }
+.modules__ip { font-family: monospace; font-size: 0.8rem; color: var(--color-text-muted) }
+.modules__pagination { display: flex; align-items: center; justify-content: center; gap: var(--space-4); padding: var(--space-3) }
+.modules__pagination button { padding: var(--space-1) var(--space-3); border: 1px solid var(--color-border); background: var(--color-surface); border-radius: var(--radius-sm); cursor: pointer }
+.modules__pagination button:disabled { opacity: 0.5; cursor: not-allowed }

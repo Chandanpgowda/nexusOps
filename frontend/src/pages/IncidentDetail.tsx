@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { api } from '../api/client';
 import { Card } from '../components/ui/Card';
@@ -51,6 +51,9 @@ export const IncidentDetail: React.FC = () => {
   const [incident, setIncident] = useState<Incident | null>(null);
   const [analysis, setAnalysis] = useState<AiAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [uploadMsg, setUploadMsg] = useState('');
+  const fileRef = useRef<HTMLInputElement>(null);
   const canDecide = roles.includes('ADMIN') || roles.includes('IT_MANAGER');
 
   useEffect(() => {
@@ -84,6 +87,26 @@ export const IncidentDetail: React.FC = () => {
     if (!id) return;
     await api.post(`/ai/incidents/${id}/ai-decision`, { decision });
     setAnalysis((prev) => prev && { ...prev, accepted: decision === 'accept', rejected: decision === 'reject' });
+  };
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !id) return;
+    setUploading(true);
+    setUploadMsg('');
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('incidentId', id);
+    try {
+      await api.post('/uploads', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      setUploadMsg(`✓ Uploaded ${file.name}`);
+    } catch (err) {
+      const msg = (err as { response?: { data?: { message?: string } } }).response?.data?.message;
+      setUploadMsg(msg || 'Upload failed');
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
   };
 
   if (loading || !incident) {
@@ -159,6 +182,18 @@ export const IncidentDetail: React.FC = () => {
           ) : (
             <Button size="sm" onClick={() => api.post(`/ai/incidents/${id}/reanalyze`)}>Run AI analysis</Button>
           )}
+        </Card>
+
+        <Card>
+          <h3>Attachments</h3>
+          <div className="incident-detail__upload">
+            <input ref={fileRef} type="file" onChange={handleUpload} accept=".png,.jpg,.jpeg,.gif,.pdf,.doc,.docx,.txt,.log" hidden />
+            <Button size="sm" variant="secondary" onClick={() => fileRef.current?.click()} disabled={uploading}>
+              {uploading ? 'Uploading…' : '+ Upload File'}
+            </Button>
+            {uploadMsg && <span className="incident-detail__upload-msg">{uploadMsg}</span>}
+          </div>
+          <p className="incident-detail__subtle">Max 10MB. Allowed: images, PDF, Word, txt, log files.</p>
         </Card>
       </div>
     </div>

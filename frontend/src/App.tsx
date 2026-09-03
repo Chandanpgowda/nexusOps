@@ -10,6 +10,8 @@ import { Assets } from './pages/Assets';
 import { Knowledge } from './pages/Knowledge';
 import { Problems } from './pages/Problems';
 import { Changes } from './pages/Changes';
+import { Admin } from './pages/Admin';
+import { AiAssistant } from './pages/AiAssistant';
 import { IncidentDetail } from './pages/IncidentDetail';
 
 export default function App() {
@@ -35,6 +37,8 @@ export default function App() {
         <Route path="knowledge" element={<Knowledge />} />
         <Route path="problems" element={<Problems />} />
         <Route path="changes" element={<Changes />} />
+        <Route path="ai-assistant" element={<AiAssistant />} />
+        <Route path="admin" element={<Admin />} />
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>

@@ -14,6 +14,9 @@ import authRoutes from './modules/auth/auth.routes';
 import incidentsRoutes from './modules/incidents/incidents.routes';
 import usersRoutes from './modules/users/users.routes';
 import { aiRoutes } from './modules/ai/ai.routes';
+import { uploadsRoutes } from './modules/uploads/uploads.routes';
+import { auditRoutes } from './modules/audit/audit.routes';
+import { adminRoutes } from './modules/admin/admin.routes';
 
 export function createApp() {
   const app = express();
@@ -40,7 +43,10 @@ app.use('/api/knowledge', knowledgeRoutes);
 app.use('/api/problems', problemsRoutes);
 app.use('/api/changes', changesRoutes);
 app.use('/api/ai', aiRoutes);
-  app.use('/api', usersRoutes);
+app.use('/api/uploads', uploadsRoutes);
+app.use('/api/audit', auditRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api', usersRoutes);
 
   app.use((_req, res) => {
     res.status(404).json({ success: false, message: 'Route not found', code: 'NOT_FOUND' });

@@ -109,3 +109,6 @@
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
 }
+
+.incident-detail__upload { display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-2) }
+.incident-detail__upload-msg { font-size: 0.85rem; color: var(--color-success) }
