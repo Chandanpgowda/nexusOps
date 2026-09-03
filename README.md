@@ -4,7 +4,7 @@
 
 NexusOps is an enterprise-style IT service management platform built on a fully open-source stack: incident, problem, change, asset & knowledge management, role-based access control, audit logging, real-time collaboration (WebSockets/Socket.IO), and a local-first AI layer backed by **Ollama** (no paid AI APIs required).
 
-> **Status: Phase 7 complete.** All core modules (incidents, assets, knowledge, problems, changes), real-time collaboration, AI layer, RBAC, audit logging, and secure file uploads are built and tested. Phase 8 (docs + E2E) is underway.
+> **Status: Complete.** All core modules (incidents, assets, knowledge, problems, changes), real-time collaboration, AI layer, RBAC, audit logging, secure file uploads, full documentation, E2E test infrastructure, and production Docker deployment are built and tested.
 
 ---
 
@@ -87,11 +87,14 @@ See `.env.example` for the full template (no real secrets are committed). Key va
 ## Docker
 
 ```bash
-docker compose up -d                # infrastructure (postgres, redis)
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+# Infrastructure only (development)
+docker compose up -d postgres redis
+
+# Full stack (production — backend + frontend + infra)
+docker compose up -d
 ```
 
-The `frontend` and `backend` application services are added in later phases.
+The frontend is served on port 80 (nginx) and proxies `/api` to the backend on port 4000. The frontend and backend application services are built via multi-stage Dockerfiles.
 
 ## Tests
 
