@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -42,6 +43,7 @@ const statusVariant: Record<string, 'info' | 'warning' | 'success' | 'default'> 
 };
 
 export const Incidents: React.FC = () => {
+  const navigate = useNavigate();
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -124,7 +126,7 @@ export const Incidents: React.FC = () => {
             columns={columns}
             data={incidents}
             keyExtractor={(item) => item.id}
-            onRowClick={(row) => console.log('navigate to', row.id)}
+                        onRowClick={(row) => navigate(`/incidents/${row.id}`)}
           />
         </Card>
       )}

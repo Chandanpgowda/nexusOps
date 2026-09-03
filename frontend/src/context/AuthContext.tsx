@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { api } from '../api/client';
+import { initSocket, disconnectSocket } from '../realtime/socketClient';
 
 interface User {
   id: string;
@@ -44,12 +45,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
+    const login = useCallback(async (email: string, password: string) => {
     const { data } = await api.post('/auth/login', { email, password });
     const { accessToken, refreshToken, user: userData } = data.data;
     localStorage.setItem('accessToken', accessToken);
     localStorage.setItem('refreshToken', refreshToken);
     setUser({ ...userData, role: userData.roles?.[0] || '' });
+    initSocket(accessToken);
   }, []);
 
   const register = useCallback(async (name: string, email: string, password: string) => {
@@ -62,8 +64,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = useCallback(() => {
     api.post('/auth/logout').catch(() => {});
-    localStorage.removeItem('accessToken');
+        localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
+    disconnectSocket();
     setUser(null);
   }, []);
 

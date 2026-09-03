@@ -19,7 +19,7 @@ export class OllamaProvider implements LlmProvider {
 
   async isAvailable(): Promise<boolean> {
     try {
-      this.client.list()
+      await this.client.list();
       return true;
     } catch {
       return false;
@@ -57,9 +57,29 @@ export class OllamaProvider implements LlmProvider {
       possibleCause: String(parsed.possibleCause || 'Unknown').slice(0, 500),
       suggestedActions: actions.length > 0 ? actions : heuristicAnalyze(input).suggestedActions,
       suggestedDepartment: parsed.suggestedDepartment ? String(parsed.suggestedDepartment) : null,
-      source: 'ai',
+            source: 'ai',
       model: env.OLLAMA_CHAT_MODEL,
     };
+  }
+
+  async embed(text: string): Promise<number[]> {
+    const response = await this.client.embeddings({
+      model: env.OLLAMA_EMBED_MODEL,
+      prompt: text,
+    });
+    return response.embedding as unknown as number[];
+  }
+
+  async chat(prompt: string): Promise<string> {
+    const response = await this.client.chat({
+      model: env.OLLAMA_CHAT_MODEL,
+      options: { temperature: 0.3 },
+      messages: [
+        { role: 'system', content: 'You are a helpful IT support assistant. Be concise and accurate.' },
+        { role: 'user', content: prompt },
+      ],
+    });
+    return response.message.content;
   }
 }
 

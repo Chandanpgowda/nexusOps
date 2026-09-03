@@ -15,6 +15,8 @@ export interface LlmProvider {
   readonly name: string;
   isAvailable(): Promise<boolean>;
   analyzeIncident(input: { title: string; description: string; category?: string }): Promise<IncidentAnalysis>;
+  embed(text: string): Promise<number[]>;
+  chat(prompt: string): Promise<string>;
 }
 
 export const VALID_CATEGORIES = [

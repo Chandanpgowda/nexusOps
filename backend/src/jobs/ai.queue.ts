@@ -5,6 +5,7 @@ import { prisma } from '../lib/prisma';
 import { socketManager } from '../lib/socket';
 import { ollamaProvider } from '../ai/ollama.provider';
 import { heuristicAnalyze } from '../ai/heuristics';
+import { ragService } from '../modules/ai/rag.service';
 
 export interface AiAnalysisJobData {
   incidentId: string;
@@ -102,4 +103,11 @@ async function runAnalysis(incidentId: string): Promise<void> {
   socketManager.emitToTicket(incidentId, 'ai:status', { incidentId, status: 'DONE' });
   socketManager.emitToTicket(incidentId, 'ai:analysis', { incidentId, analysis });
   logger.info({ incidentId, source: analysis.source }, 'AI analysis complete');
+
+  // Generate embedding for duplicate detection (fire-and-forget — best effort)
+  try {
+    await ragService.storeIncidentEmbedding(incidentId);
+  } catch (err) {
+    logger.warn({ err, incidentId }, 'Failed to store incident embedding');
+  }
 }
