@@ -2,7 +2,7 @@
 # Deploy: https://render.com/docs/blueprint-spec
 
 services:
-  # Backend API
+  # Backend API (Docker)
   - type: web
     name: nexusops-backend
     runtime: docker
@@ -24,10 +24,7 @@ services:
           name: nexusops-db
           property: connectionString
       - key: REDIS_URL
-        fromService:
-          type: redis
-          name: nexusops-redis
-          property: connectionString
+        sync: false
       - key: JWT_ACCESS_SECRET
         generateValue: true
       - key: JWT_REFRESH_SECRET
@@ -78,7 +75,3 @@ databases:
     user: nexusops
     postgresMajorVersion: "16"
 
-# Redis (using Upstash for free tier)
-# Note: Render doesn't have free Redis. Use Upstash instead.
-# Create free Redis at: https://upstash.com/
-# Then add REDIS_URL manually in Render dashboard
