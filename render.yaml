@@ -1,0 +1,84 @@
+# Render Blueprint for NexusOps
+# Deploy: https://render.com/docs/blueprint-spec
+
+services:
+  # Backend API
+  - type: web
+    name: nexusops-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: CORS_ORIGIN
+        fromService:
+          type: web
+          name: nexusops-frontend
+          envVarKey: RENDER_EXTERNAL_URL
+      - key: DATABASE_URL
+        fromDatabase:
+          name: nexusops-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: nexusops-redis
+          property: connectionString
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: JWT_ACCESS_EXPIRES
+        value: 15m
+      - key: JWT_REFRESH_EXPIRES_DAYS
+        value: 7
+      - key: ENCRYPTION_KEY
+        generateValue: true
+      - key: OLLAMA_BASE_URL
+        value: ""
+      - key: AI_ENABLED
+        value: "false"
+      - key: UPLOAD_DIR
+        value: /tmp/uploads
+      - key: MAX_UPLOAD_MB
+        value: "10"
+      - key: RATE_LIMIT_WINDOW_MINUTES
+        value: "15"
+      - key: RATE_LIMIT_MAX
+        value: "100"
+      - key: AUTH_RATE_LIMIT_MAX
+        value: "10"
+
+  # Frontend Static Site
+  - type: web
+    name: nexusops-frontend
+    runtime: static
+    buildCommand: npm ci && npm run build --workspace frontend
+    staticPublishPath: ./frontend/dist
+    routes:
+      - type: rewrite
+        source: /api/*
+        destination: https://nexusops-backend.onrender.com/api/*
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    envVars:
+      - key: VITE_API_URL
+        value: https://nexusops-backend.onrender.com
+
+# Databases
+databases:
+  - name: nexusops-db
+    plan: free
+    databaseName: nexusops
+    user: nexusops
+    postgresMajorVersion: "16"
+
+# Redis (using Upstash for free tier)
+# Note: Render doesn't have free Redis. Use Upstash instead.
+# Create free Redis at: https://upstash.com/
+# Then add REDIS_URL manually in Render dashboard
