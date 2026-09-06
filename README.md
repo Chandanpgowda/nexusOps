@@ -8,6 +8,53 @@ NexusOps is an enterprise-style IT service management platform built on a fully 
 
 ---
 
+## Why NexusOps?
+
+IT operations teams struggle with fragmented tools: one system for tickets, another for assets, a separate knowledge base, and no intelligent assistance for diagnosing incidents. NexusOps unifies all of these into a single, cohesive platform.
+
+**The problem:** When an incident occurs, technicians waste time searching through documentation, manually categorizing tickets, and duplicating work on similar past issues. Meanwhile, managers lack real-time visibility into team workload and SLA compliance.
+
+**The solution:** NexusOps combines traditional ITSM workflows with modern AI assistance. Incidents are automatically classified and prioritized using local AI models. The RAG-powered knowledge assistant surfaces relevant documentation in real time. Semantic duplicate detection prevents redundant work. And everything updates live via WebSockets — no page refreshes needed.
+
+**The value:** Faster resolution times, consistent categorization, knowledge reuse, and full auditability — all running on infrastructure you control, with no vendor lock-in and no per-seat licensing fees.
+
+---
+
+## Architecture
+
+```mermaid
+graph TB
+    subgraph Client["Client Browser"]
+        FE["React + TypeScript + Vite"]
+    end
+
+    subgraph Server["Node.js Backend"]
+        API["Express REST API"]
+        SIO["Socket.IO Server"]
+        WORKER["BullMQ Worker"]
+    end
+
+    subgraph Data["Data Layer"]
+        PG["PostgreSQL 16 + pgvector"]
+        REDIS["Redis 7"]
+    end
+
+    subgraph AI["AI Layer"]
+        OLLAMA["Ollama LLM"]
+    end
+
+    FE -->|REST API| API
+    FE -->|WebSocket| SIO
+    API --> PG
+    API --> REDIS
+    SIO --> REDIS
+    WORKER --> REDIS
+    WORKER --> PG
+    WORKER -->|embeddings + chat| OLLAMA
+```
+
+---
+
 ## Tech Stack
 
 | Layer | Technology |
@@ -20,6 +67,99 @@ NexusOps is an enterprise-style IT service management platform built on a fully 
 | Testing | Vitest, Supertest, Playwright (roadmap) |
 | CI/CD | GitHub Actions |
 | Infra | Docker + Docker Compose |
+
+---
+
+## Project Metrics
+
+| Metric | Count |
+|---|---|
+| RBAC Roles | 4 (ADMIN, IT_MANAGER, TECHNICIAN, EMPLOYEE) |
+| Fine-grained Permissions | 18 |
+| Incident Statuses | 9 (OPEN, ASSIGNED, IN_PROGRESS, WAITING_FOR_USER, WAITING_FOR_VENDOR, RESOLVED, CLOSED, REOPENED) |
+| Incident Priorities | 4 (LOW, MEDIUM, HIGH, CRITICAL) |
+| Incident Categories | 10 (NETWORK, HARDWARE, SOFTWARE, SECURITY, ACCOUNT, EMAIL, SERVER, DATABASE, VPN, OTHER) |
+| Database Models | 25+ |
+| API Modules | 11 (auth, incidents, notifications, assets, knowledge, problems, changes, ai, uploads, audit, admin) |
+| Real-time Event Types | 8 (ticket:created, ticket:updated, ticket:comment, notification:new, ai:analysis, ai:status, presence:update) |
+| Automated Tests | 44 (backend unit + integration) |
+| AI Capabilities | Classification, priority recommendation, cause analysis, troubleshooting steps, duplicate detection, RAG Q&A |
+
+---
+
+## Features
+
+### Incident Management
+- Full lifecycle: create → assign → progress → resolve → close → reopen
+- SLA deadlines with automatic breach detection
+- Priority-based escalation (CRITICAL 1h, HIGH 4h, MEDIUM 8h, LOW 24h)
+- Status transition validation (state machine)
+- Comments with real-time delivery
+- File attachments with magic byte validation
+- Complete history trail
+
+### AI-Powered Analysis
+- Automatic incident classification and priority recommendation
+- Possible cause analysis and troubleshooting steps
+- Semantic duplicate detection (pgvector cosine similarity)
+- RAG-powered knowledge assistant with cited sources
+- Graceful fallback to keyword heuristics when AI is unavailable
+
+### Real-Time Collaboration
+- WebSocket-based live updates (no page refreshes)
+- Incident comments broadcast instantly
+- Notification delivery with unread counts
+- User presence indicators (online/away/offline)
+- Room-based event routing (user, role, department, ticket)
+
+### Asset Management
+- Full asset lifecycle tracking
+- Assignment to users and departments
+- Warranty and purchase tracking
+- Multiple asset types (laptop, desktop, server, network, monitor)
+
+### Knowledge Base
+- Article workflow (draft → review → published → archived)
+- Semantic search via embeddings
+- Category and tag organization
+- View count tracking
+
+### Problem & Change Management
+- Problem linking to incidents
+- Change request workflow with approvals
+- CAB (Change Advisory Board) approval process
+
+### Security & Compliance
+- JWT authentication with refresh token rotation
+- Role-based access control (RBAC) with fine-grained permissions
+- Password hashing (bcrypt, cost factor 12)
+- Rate limiting (general + auth-specific)
+- Helmet security headers
+- CORS configuration
+- Immutable audit logging
+- Secure file uploads (magic byte validation, type restrictions)
+
+---
+
+## Screenshots
+
+| Login | Dashboard |
+|---|---|
+| ![Login](docs/screenshots/login.png) | ![Dashboard](docs/screenshots/dashboard.png) |
+
+| Incidents List | Incident Detail |
+|---|---|
+| ![Incidents](docs/screenshots/incidents.png) | ![Incident Detail](docs/screenshots/incident-detail.png) |
+
+| AI Analysis | Knowledge Base |
+|---|---|
+| ![AI Analysis](docs/screenshots/ai-analysis.png) | ![Knowledge](docs/screenshots/knowledge.png) |
+
+| Assets | Admin Panel |
+|---|---|
+| ![Assets](docs/screenshots/assets.png) | ![Admin](docs/screenshots/admin.png) |
+
+> **Note:** To capture screenshots, run the application locally and navigate to each page. Save PNG images to `docs/screenshots/` with the filenames shown above.
 
 ---
 
@@ -118,6 +258,13 @@ npm run build                        # full workspace build
 - **Phase 8 (DONE):** Documentation suite + E2E test infrastructure
 
 Full architecture & design documentation lives in `docs/`.
+
+## Live Demo
+
+> **Frontend:** `<DEPLOYED_FRONTEND_URL>`
+> **Backend:** `<DEPLOYED_BACKEND_URL>`
+
+(Deploy to your preferred cloud provider — see `docs/deployment.md` for free-tier options.)
 
 ## License
 

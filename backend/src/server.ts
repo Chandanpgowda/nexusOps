@@ -18,3 +18,22 @@ if (env.AI_ENABLED) {
 server.listen(env.PORT, () => {
   logger.info(`🚀 NexusOps API listening on http://localhost:${env.PORT}`);
 });
+
+// Graceful shutdown
+let shuttingDown = false;
+async function shutdown(signal: string) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info({ signal }, 'Shutting down...');
+  server.close(() => {
+    logger.info('HTTP server closed');
+    process.exit(0);
+  });
+  // Force exit after 10s
+  setTimeout(() => {
+    logger.error('Forced shutdown');
+    process.exit(1);
+  }, 10_000);
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
