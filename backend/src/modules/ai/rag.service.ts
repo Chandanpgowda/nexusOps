@@ -37,6 +37,10 @@ export const ragService = {
 
   async storeArticleEmbedding(articleId: string, content: string, chunkIndex = 0): Promise<void> {
     const embedding = await this.embedText(content);
+    if (embedding.length === 0) {
+      logger.warn({ articleId }, 'Empty embedding returned — skipping');
+      return;
+    }
     const vectorStr = `[${embedding.join(',')}]`;
     await prisma.$executeRaw`
       INSERT INTO "KnowledgeEmbedding" ("articleId", "chunkIndex", content, embedding)
@@ -74,7 +78,16 @@ ${context}
 Question: ${question}
 
 Provide a concise, helpful answer with citations.`;
-    const response = await ollamaProvider.chat(prompt);
-    return { answer: response, sources: sources.map((s) => ({ title: s.title, similarity: s.similarity })) };
+    try {
+      const response = await ollamaProvider.chat(prompt);
+      return { answer: response, sources: sources.map((s) => ({ title: s.title, similarity: s.similarity })) };
+    } catch (err) {
+      // If AI model is too slow/unavailable, return sources as fallback
+      const sourceList = sources.map((s) => `- ${s.title}`).join('\n');
+      return {
+        answer: `I found these relevant articles that may help:\n${sourceList}\n\n(The AI assistant is currently slow — try again in a moment for a generated answer.)`,
+        sources: sources.map((s) => ({ title: s.title, similarity: s.similarity })),
+      };
+    }
   },
 };

@@ -36,7 +36,20 @@ class SocketManager {
         const token = socket.handshake.auth?.token as string | undefined;
         if (!token) return next(new Error('Authentication required'));
         const payload = verifyAccessToken(token);
-        socket.data.user = payload;
+        // Fetch roles from DB (not included in JWT)
+        const user = await prisma.user.findUnique({
+          where: { id: payload.sub },
+          select: {
+            id: true,
+            roles: { select: { role: { select: { name: true } } } },
+          },
+        });
+        if (!user) return next(new Error('User not found'));
+        socket.data.user = {
+          userId: user.id,
+          email: payload.email,
+          roles: user.roles.map((r) => r.role.name),
+        };
         next();
       } catch {
         next(new Error('Invalid token'));

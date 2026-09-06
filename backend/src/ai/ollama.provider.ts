@@ -71,15 +71,26 @@ export class OllamaProvider implements LlmProvider {
   }
 
   async chat(prompt: string): Promise<string> {
-    const response = await this.client.chat({
-      model: env.OLLAMA_CHAT_MODEL,
-      options: { temperature: 0.3 },
-      messages: [
-        { role: 'system', content: 'You are a helpful IT support assistant. Be concise and accurate.' },
-        { role: 'user', content: prompt },
-      ],
-    });
-    return response.message.content;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 25000); // 25s timeout
+    try {
+      const response = await this.client.chat({
+        model: env.OLLAMA_CHAT_MODEL,
+        options: { temperature: 0.3, num_predict: 500 },
+        messages: [
+          { role: 'system', content: 'You are a helpful IT support assistant. Be concise and accurate.' },
+          { role: 'user', content: prompt },
+        ],
+      });
+      clearTimeout(timeout);
+      return response.message.content;
+    } catch (err) {
+      clearTimeout(timeout);
+      if (err.name === 'AbortError') {
+        throw new Error('AI model is taking too long to respond. Please try again or use a faster model.');
+      }
+      throw err;
+    }
   }
 }
 
