@@ -38,7 +38,7 @@ services:
       - key: OLLAMA_BASE_URL
         value: ""
       - key: AI_ENABLED
-        value: "false"
+        value: false
       - key: UPLOAD_DIR
         value: /tmp/uploads
       - key: MAX_UPLOAD_MB
