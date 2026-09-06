@@ -1,171 +1,324 @@
-# Deployment
+# Oracle Cloud Deployment Guide
 
-NexusOps is designed to run fully on **free and open-source infrastructure**. No paid service is required.
+Complete guide to deploy NexusOps on Oracle Cloud Infrastructure (OCI) **Always Free Tier**.
 
-## Local Development (Docker)
+## Architecture on Oracle Cloud
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Oracle Cloud VM (Always Free)              │
+│                  VM.Standard.A1.Flex (4 OCPU, 24GB RAM)      │
+│                                                               │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
+│  │   Nginx     │  │   Backend   │  │   Ollama    │          │
+│  │   :80/:443  │──│   :4000     │  │   :11434    │          │
+│  └─────────────┘  └──────┬──────┘  └─────────────┘          │
+│                          │                                    │
+│                   ┌──────┴──────┐                            │
+│                   │             │                             │
+│              ┌────▼────┐  ┌────▼────┐                       │
+│              │PostgreSQL│  │  Redis  │                       │
+│              │  :5432   │  │  :6379  │                       │
+│              └─────────┘  └─────────┘                       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Prerequisites
+
+- Oracle Cloud account (free tier is sufficient)
+- SSH key pair (RSA or ED25519)
+- Domain name (optional, for HTTPS with Let's Encrypt)
+
+---
+
+## Step 1: Create the VM Instance
+
+### Via OCI Console
+
+1. Go to **Compute → Instances → Create Instance**
+2. **Name**: `nexusops-prod`
+3. **Image**: Canonical Ubuntu 22.04 (or 24.04)
+4. **Shape**: VM.Standard.A1.Flex
+   - **OCPUs**: 4 (Always Free allows up to 4)
+   - **Memory**: 24 GB (Always Free allows up to 24)
+5. **SSH Keys**: Upload your public key or let OCI generate one
+6. **Boot Volume**: 200 GB (Always Free allows up to 200)
+7. **Networking**:
+   - Create a new VCN with public subnet
+   - Assign a public IP address
+
+### Via OCI CLI
 
 ```bash
-git clone <repository>
+# Create VCN and subnet (if not exists)
+oci vcn create --cidr-block 10.0.0.0/16 --display-name nexusops-vcn --compartment-id <COMPARTMENT_ID>
+
+# Create subnet
+oci subnet create --vcn-id <VCN_ID> --cidr-block 10.0.0.0/24 --display-name nexusops-subnet --compartment-id <COMPARTMENT_ID>
+
+# Create instance
+oci compute create \
+  --compartment-id <COMPARTMENT_ID> \
+  --availability-domain <AD> \
+  --shape VM.Standard.A1.Flex \
+  --shape-config '{"ocpus":4,"memoryInGBs":24}' \
+  --source-details '{"sourceType":"image","imageId":"<IMAGE_ID>","bootVolumeSizeInGBs":200}' \
+  --display-name nexusops-prod \
+  --ssh-authorized-keys-file ~/.ssh/id_rsa.pub \
+  --subnet-id <SUBNET_ID>
+```
+
+---
+
+## Step 2: Configure Networking
+
+### Open Required Ports
+
+Go to **Networking → Virtual Cloud Networks → Your VCN → Security List → Add Ingress Rules**:
+
+| Port | Source | Purpose |
+|------|--------|---------|
+| 22 | Your IP | SSH access |
+| 80 | 0.0.0.0/0 | HTTP (redirects to HTTPS) |
+| 443 | 0.0.0.0/0 | HTTPS (frontend + API) |
+| 4000 | 0.0.0.0/0 | Backend API (direct access, optional) |
+
+### Via OCI CLI
+
+```bash
+# Get security list ID
+SEC_LIST=$(oci network security-list list --vcn-id <VCN_ID> --compartment-id <COMPARTMENT_ID> --query 'data[0].id' --raw-output)
+
+# Add ingress rules
+oci network security-list update \
+  --security-list-id $SEC_LIST \
+  --ingress-security-rules '[{"source":"0.0.0.0/0","protocol":"6","tcpOptions":{"destinationPortRange":{"min":80,"max":80}}}]'
+
+oci network security-list update \
+  --security-list-id $SEC_LIST \
+  --ingress-security-rules '[{"source":"0.0.0.0/0","protocol":"6","tcpOptions":{"destinationPortRange":{"min":443,"max":443}}}]'
+```
+
+---
+
+## Step 3: Connect to the VM
+
+```bash
+# Get the public IP from the OCI console
+ssh ubuntu@<PUBLIC_IP>
+
+# Update system
+sudo apt update && sudo apt upgrade -y
+```
+
+---
+
+## Step 4: Install Docker & Docker Compose
+
+```bash
+# Install Docker
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
+newgrp docker
+
+# Install Docker Compose
+sudo apt install -y docker-compose-plugin
+
+# Verify
+docker --version
+docker compose version
+```
+
+---
+
+## Step 5: Clone and Configure NexusOps
+
+```bash
+# Clone the repository
+git clone https://github.com/Chandanpgowda/nexusOps.git
 cd nexusops
 
-# Start infrastructure
-docker compose up -d postgres redis
-
-# Install dependencies
-npm install
-
-# Setup environment
+# Create production environment
 cp .env.example .env
-# Fill in real secrets
-
-# Run migrations + seed
-cd backend
-npx prisma migrate dev
-npx tsx prisma/seed.ts
-
-# Run apps (two terminals)
-npm run dev --workspace backend    # API on :4000
-npm run dev --workspace frontend   # UI on :5173
+nano .env
 ```
 
-## Production Docker Build
+### Production `.env` Configuration
 
-```dockerfile
-# Multi-stage build for backend
-FROM node:22-alpine AS builder
-WORKDIR /app
-COPY backend/package*.json ./
-RUN npm ci
-COPY backend/ ./
-RUN npx prisma generate
-RUN npm run build
+```env
+NODE_ENV=production
+PORT=4000
+CORS_ORIGIN=https://your-domain.com
 
-FROM node:22-alpine
-WORKDIR /app
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
-EXPOSE 4000
-CMD ["node", "dist/server.js"]
+# Database (local PostgreSQL in Docker)
+DATABASE_URL=postgresql://nexusops:STRONG_DB_PASSWORD@postgres:5432/nexusops?schema=public
+
+# Redis (local Redis in Docker)
+REDIS_URL=redis://redis:6379
+
+# Auth secrets (generate with: openssl rand -hex 64)
+JWT_ACCESS_SECRET=<64_CHAR_HEX>
+JWT_REFRESH_SECRET=<64_CHAR_HEX>
+JWT_ACCESS_EXPIRES=15m
+JWT_REFRESH_EXPIRES_DAYS=7
+
+# Encryption key (generate with: openssl rand -hex 32)
+ENCRYPTION_KEY=<32_CHAR_HEX>
+
+# AI (Ollama running locally)
+OLLAMA_BASE_URL=http://ollama:11434
+OLLAMA_CHAT_MODEL=qwen2.5:3b
+OLLAMA_EMBED_MODEL=nomic-embed-text
+AI_ENABLED=true
+
+# Uploads
+UPLOAD_DIR=./uploads
+MAX_UPLOAD_MB=10
+
+# Rate limiting
+RATE_LIMIT_WINDOW_MINUTES=15
+RATE_LIMIT_MAX=100
+AUTH_RATE_LIMIT_MAX=10
 ```
 
-## Free Cloud Deployment Options
-
-### Option 1: Railway / Render (Free Tier)
-
-| Service | Free tier limit | Notes |
-|---|---|---|
-| Railway | 500 hours/month | Good for backend + Postgres |
-| Render | 750 hours/month | Web service + Postgres |
-| Supabase | 500 MB Postgres | Alternative to self-hosted PG |
-
-**Limitation**: Ollama requires too much RAM for free tiers. Deploy without AI or use a separate GPU server.
-
-### Option 2: Oracle Cloud Free Tier (Always Free)
-
-| Resource | Always-free allowance |
-|---|---|
-| Compute | 4 ARM cores, 24 GB RAM |
-| Block storage | 200 GB |
-| Database | 2 Autonomous DBs |
-
-This is the **best free option** for running Ollama alongside the app.
-
-### Option 3: Home Server / Raspberry Pi
-
-Run everything on your own hardware:
-- Docker Compose on a home server
-- Tailscale for secure remote access
-- No monthly costs
-
-## Environment Variables
-
-| Variable | Required | Description |
-|---|---|---|
-| `DATABASE_URL` | Yes | PostgreSQL connection string |
-| `REDIS_URL` | Yes | Redis connection string |
-| `JWT_ACCESS_SECRET` | Yes | Min 32 chars, random |
-| `JWT_REFRESH_SECRET` | Yes | Min 32 chars, random |
-| `ENCRYPTION_KEY` | Yes | 32-byte hex string |
-| `CORS_ORIGIN` | Yes | Frontend origin URL |
-| `OLLAMA_BASE_URL` | No | Ollama server URL |
-| `OLLAMA_CHAT_MODEL` | No | Default: `qwen2.5:7b` |
-| `OLLAMA_EMBED_MODEL` | No | Default: `nomic-embed-text` |
-| `AI_ENABLED` | No | Default: `true` |
-| `UPLOAD_DIR` | No | Default: `./uploads` |
-
-## Health Checks
+### Generate Secrets
 
 ```bash
+# Generate JWT secrets
+openssl rand -hex 64  # JWT_ACCESS_SECRET
+openssl rand -hex 64  # JWT_REFRESH_SECRET
+openssl rand -hex 32  # ENCRYPTION_KEY
+```
+
+---
+
+## Step 6: Deploy
+
+```bash
+# Pull latest code
+git pull origin master
+
+# Start all services
+docker compose up -d --build
+
+# Wait for services to be healthy
+docker compose ps
+
+# Run database migrations
+docker compose exec backend npx prisma migrate deploy
+
+# Seed demo data
+docker compose exec backend npx tsx prisma/seed.ts
+
+# Pull Ollama models (this may take a while)
+docker compose exec ollama ollama pull qwen2.5:3b
+docker compose exec ollama ollama pull nomic-embed-text
+```
+
+---
+
+## Step 7: Set Up HTTPS (Optional but Recommended)
+
+```bash
+# Stop nginx temporarily
+docker compose stop nginx
+
+# Get SSL certificate
+docker run -it --rm \
+  -v $(pwd)/nginx/certbot/conf:/etc/letsencrypt \
+  -v $(pwd)/nginx/certbot/www:/var/www/certbot \
+  certbot/certbot certonly \
+  --webroot \
+  --webroot-path=/var/www/certbot \
+  --email your-email@example.com \
+  --agree-tos \
+  --no-eff-email \
+  -d your-domain.com
+
+# Restart nginx
+docker compose up -d nginx
+```
+
+---
+
+## Step 8: Verify Deployment
+
+```bash
+# Check all services are running
+docker compose ps
+
+# Check logs
+docker compose logs -f backend
+
+# Test health endpoint
 curl http://localhost:4000/health
-# {"status":"ok","service":"nexusops-api"}
+
+# Test from outside (replace with your public IP or domain)
+curl http://<PUBLIC_IP>/health
 ```
 
-Docker Compose includes health checks for postgres and redis:
+---
 
-```yaml
-healthcheck:
-  test: ["CMD-SHELL", "pg_isready -U nexusops"]
-  interval: 10s
-  timeout: 5s
-  retries: 5
-```
-
-## Monitoring
-
-| Tool | Purpose | Cost |
-|---|---|---|
-| Pino (built-in) | Structured logging | Free |
-| pg_stat_statements | Query performance | Free (PG extension) |
-| Redis INFO | Cache hit rates | Free |
-| Uptime Kuma | Uptime monitoring | Free (self-hosted) |
-
-## Backup Strategy
+## Step 9: Set Up Automated Backups
 
 ```bash
-# PostgreSQL backup
-docker exec nexusops-postgres pg_dump -U nexusops nexusops > backup.sql
+# Create backup directory
+mkdir -p ~/backups
 
-# Restore
-cat backup.sql | docker exec -i nexusops-postgres psql -U nexusops nexusops
+# Add to crontab (daily at 2 AM)
+(crontab -l 2>/dev/null; echo "0 2 * * * cd ~/nexusops && docker exec nexusops-postgres pg_dump -U nexusops nexusops | gzip > ~/backups/db_\$(date +\%Y\%m\%d).sql.gz") | crontab -
 ```
 
-Schedule with cron:
+---
+
+## Useful Commands
 
 ```bash
-0 2 * * * cd /path/to/nexusops && ./scripts/backup.sh
+# View logs
+docker compose logs -f [service]
+
+# Restart a service
+docker compose restart [service]
+
+# Update deployment (after git pull)
+docker compose up -d --build
+
+# Check resource usage
+docker stats
+
+# Access database shell
+docker compose exec postgres psql -U nexusops -d nexusops
+
+# Access Redis CLI
+docker compose exec redis redis-cli
 ```
 
-## Scaling Considerations
+---
 
-| Scale | Architecture |
-|---|---|
-| < 100 users | Single backend instance, local Postgres |
-| 100–10,000 users | Multiple backend instances, PgBouncer, Redis Sentinel |
-| 10,000+ users | Kubernetes, read replicas, CDN for frontend |
+## Cost Estimate
 
-## CI/CD (GitHub Actions)
+| Resource | Always Free Limit | Used |
+|----------|-------------------|------|
+| Compute (VM.Standard.A1.Flex) | 4 OCPU, 24 GB RAM | 4 OCPU, 24 GB |
+| Block Storage | 200 GB | ~20 GB |
+| Outbound Data Transfer | 10 TB/month | < 1 GB |
+| **Monthly Cost** | **$0.00** | **$0.00** |
 
-The included workflow runs on every push:
+---
 
-1. **Lint** — ESLint for backend and frontend
-2. **Typecheck** — TypeScript strict mode
-3. **Test** — Vitest unit + integration tests
-4. **Build** — Production build verification
-5. **Docker** — Image build verification
+## Troubleshooting
 
-```yaml
-# .github/workflows/ci.yml
-on: [push, pull_request]
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with: { node-version: 22 }
-      - run: npm ci
-      - run: npm run lint
-      - run: npm run typecheck
-      - run: npm run test
-      - run: npm run build
-```
+### Out of Memory
+- Reduce Ollama model size (use `qwen2.5:1.5b` instead of `3b`)
+- Limit Redis memory: `--maxmemory 256mb`
+- Add swap space: `sudo fallocate -l 4G /swapfile && sudo chmod 600 /swapfile && sudo mkswap /swapfile && sudo swapon /swapfile`
+
+### Services Not Starting
+- Check logs: `docker compose logs [service]`
+- Verify env vars: `docker compose config`
+- Check disk space: `df -h`
+
+### Database Connection Issues
+- Verify postgres is healthy: `docker compose ps`
+- Check connection string format
+- Ensure pgvector extension is installed (included in image)
