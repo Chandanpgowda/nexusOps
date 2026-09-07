@@ -18,6 +18,7 @@ interface RecentIncident {
   status: string;
   priority: string;
   createdAt: string;
+  slaBreached?: boolean;
 }
 
 export const Dashboard: React.FC = () => {
